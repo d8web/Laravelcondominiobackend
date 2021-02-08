@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 use Illuminate\Http\Request;
 use App\Models\Warning;
@@ -37,6 +39,7 @@ class WarningController extends Controller
 
                     foreach($photos as $photo) {
                         if(!empty($photo)) {
+                            // Montando o link da photo
                             $photolist[] = asset('storage/'.$photo);
                         }
                     }
@@ -56,4 +59,69 @@ class WarningController extends Controller
 
         return $array;
     }
+
+    public function addWarningFile(Request $request)
+    {
+        $array = ['error' => ''];
+
+        $validator = Validator::make($request->all(), [
+            'photo' => 'required|file|mimes:jpg,png'
+        ]);
+
+        if(!$validator->fails()) {
+            $file = $request->file('photo')->store('public');
+
+            // Montar a url
+            $array['photo'] = asset(Storage::url($file));
+        } else {
+            $array['error'] = $validator->errors()->first();
+        }
+
+        return $array;
+    }
+
+    public function setWarning(Request $request)
+    {
+        $array = ['error' => ''];
+
+        $validator = Validator::make($request->all(), [
+            'title' => 'required',
+            'property' => 'required'
+        ]);
+
+        if(!$validator->fails()) {
+
+            $title = $request->input('title');
+            $property = $request->input('property');
+            $list = $request->input('list');
+
+            $newWarn = new Warning();
+            $newWarn->id_unit = $property;
+            $newWarn->title = $title;
+            $newWarn->status = 'IN_REVIEW';
+            $newWarn->datecreated = date('Y/m/d');
+
+            if($list && is_array($list)) {
+                $photos = [];
+
+                foreach($list as $listItem)
+                {
+                    $url = explode('/', $listItem);
+                    $photos[] = end($url);
+                }
+
+                $newWarn->photos = implode(',', $photos);
+            } else {
+                $newWarn->photos = '';
+            }
+
+            $newWarn->save();
+
+        } else {
+            $array['error'] = $validator->errors()->first();
+        }
+
+        return $array;
+    }
+
 }
