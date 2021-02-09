@@ -1,5 +1,5 @@
 <?php
-// Continuar aula -> /unit/{id}/add x
+// Continuar aula -> /reservation/{id}/disableddates
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
