@@ -1,5 +1,6 @@
 <?php
 // Continuar aula -> /reservation/{id}/disableddates
+// Revisar método getTimes // Reassistir aula /reservation/{id}/times 2
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
