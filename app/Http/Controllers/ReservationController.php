@@ -123,91 +123,100 @@ class ReservationController extends Controller
 
     public function getTimes($id, Request $request)
     {
-        $array = ['error' => '', 'list' => []];
-
+      $array = ['error' => '', 'list' => []];
+      
         $validator = Validator::make($request->all(), [
-            'date' => 'required|date_format:Y-m-d'
+          'date' => 'required|date_format:Y-m-d'
         ]);
 
         if(!$validator->fails()) {
 
-            $date = $request->input('date');
+          $date = $request->input('date');
+          $area = Area::find($id);
 
-            $area = Area::find($id);
-            if($area) {
+          if($area)
+          {
+            $can = true;
 
-                $can = true;
-
-                // Verificar se o dia está desabilitado
-                $existingDisabledDay = AreaDisabledDay::where('id_area', $id)
-                    ->where('day', $date)
-                    ->count();
-                if($existingDisabledDay > 0) {
-                    $can = false;
-                }
-
-                // Verificar se o dia esta permitido
-                $allowedDays = explode(',', $area['days']);
-                $weekDay = date('w', strtotime($date));
-                if(!in_array($weekDay, $allowedDays)) {
-                    $can = false;
-                }
-
-                if($can) {
-                    $start = strtotime($area['start_time']);
-                    $end = strtotime($area['end_time']);
-
-                    $times = [];
-
-                    for(
-                        $lastTime = $start;
-                        $lastTime < $end;
-                        $lastTime = strtotime('+1 hour', $lastTime)
-                    ) {
-                        $times[] = $lastTime;
-                    }
-
-                    $timeList = [];
-                    foreach($times as $time) {
-                        $timeList[] = [
-                            'id' => date('H:i:s', $time),
-                            'title' => date('H:i', $time).' - '.date('H:i', strtotime('+1 hour', $time))
-                        ];
-                    }
-
-                    // Removendo reservas
-                    $reservations = Reservation::where('id_area', $id)
-                        ->whereBetween('reservation_date', [
-                            $date.' 00:00:00',
-                            $date.' 23:59:59'
-                        ])
-                        ->get();
-                    
-                    $toRemove = [];
-                    foreach($reservations as $reservation) {
-                        $time = date('H:i:s', strtotime($reservations['reservation_date']));
-                        $toRemove[] = $time;
-                    }
-
-                    foreach($timeList as $timeItem) {
-                        if(!in_array($timeItem['id'], $toRemove)) {
-                            $array['list'][] = $timeItem;
-                        }
-                    }
-                    
-                }
-
-            } else {
-                $array['error'] = 'Area não existe!';
-                return $array;
+            // Verificar se o dia não é permitido
+            $existingDisabledDay = AreaDisabledDay::where('id_area', $id)->where('day', $date)->count();
+            if($existingDisabledDay > 0)
+            {
+              // Se $existingDisabledDay for maior que 0, significa que o dia na area $id está bloqueado.
+              $can = false;
             }
 
-        } else {
-            $array['error'] = $validator->errors()->first();
+            // Verificar se o dia é permitido
+            $allowedDays = explode(',', $area['days']); // $area['days'] = 1,2,3,4
+            $weekDay = date('w', strtotime($date));
+            if(!in_array($weekDay, $allowedDays))
+            {
+              $can = false;
+            }
+
+            // Se can ainda for true, retornamos a lista de horários da data enviada em date
+            if($can)
+            {
+              $start = strtotime($area['start_time']);
+              $end = strtotime($area['end_time']);
+
+              $times = [];
+              // $lasttime = $start, enquanto $lasttime < $end, $lasttime + 1 hora.
+
+              for($lastTime = $start; $lastTime < $end; $lastTime = strtotime('+1 hour', $lastTime))
+              {
+                // Retorna os horários da area $id na data $date no formato timestamps.
+                $times[] = $lastTime;
+              }
+
+              $timeList = [];
+              foreach($times as $time)
+              {
+                $timeList[] = [
+                  'id' => date('H:i:s', $time), // data real retornada do timestamps $times
+                  'title' => date('H:i', $time).' - '.date('H:i', strtotime('+ 1 hour', $time)) // hora - + 1hora
+                ];
+              }
+
+              // Remover horários que tem reserva
+              $reservations = Reservation::where('id_area', $id)->whereBetween('reservation_date', [
+                $date.' 00:00:00',
+                $date.' 23:59:59'
+              ])->get();
+              
+              // Gerando as horas a serem removidas do array $timeList
+              $toRemove = [];
+              foreach($reservations as $reservation)
+              {
+                // Pegando a hora da reserva reservation_date e adicionando no array pra remover.
+                $time = date('H:i:s', strtotime($reservation['reservation_date']));
+                $toRemove[] = $time;
+              }
+
+              foreach($timeList as $timeItem)
+              {
+                // Verificar se no array $timeItem['id'] não possui a hora da reserva
+                if(!in_array($timeItem['id'], $toRemove))
+                {
+                  $array['list'][] = $timeItem;
+                }
+              }
+
+            }
+
+          } 
+          else {
+            $array['error'] = 'Esta area não existe!';
             return $array;
+          }
+
+        }
+        else {
+          $array['error'] = $validator->errors()->first();
+          return $array;
         }
 
-        return $array;
+      return $array;
     }
 
     public function setReservation($id, Request $request)
