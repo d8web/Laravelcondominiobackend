@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 use App\Models\Area;
 use App\Models\AreaDisabledDay;
@@ -297,4 +298,73 @@ class ReservationController extends Controller
         return $array;
     }
 
+    public function getMyReservations(Request $request)
+    {
+      $array = ['error' => '', 'list' => []];
+
+      $property = $request->input('property');
+      if($property) {
+
+        $unit = Unit::find($property);
+        if($unit) {
+
+          $reservations = Reservation::where('id_unit', $property)->orderBy('reservation_date', 'DESC')->get();
+          foreach($reservations as $reservation)
+          {
+            $area = Area::find($reservation['id_area']);
+
+            $daterev = date('d/m/Y H:i', strtotime($reservation['reservation_date']));
+            $afterTime = date('H:i', strtotime('+1 hour', strtotime($reservation['reservation_date'])));
+
+            $daterev .= ' às '.$afterTime;
+
+            $array['list'][] = [
+              'id' => $reservation['id'],
+              'id_area' => $reservation['id_area'],
+              'title' => $area['title'],
+              'cover' => asset('storage/'.$area['cover']),
+              'date_reserved' => $daterev
+            ];
+          }
+
+        } else {
+          $array['error'] = 'Propriedade não existe';
+          return $array;
+        }
+
+      } else {
+        $array['error'] = 'Propriedade não enviada!';
+        return $array;
+      }
+
+      return $array;
+    }
+
+    public function delMyReservation($id)
+    {
+      $array = ['error' => ''];
+
+      $user = Auth::user();
+      $reservation = Reservation::find($id);
+
+      if($reservation)
+      {
+
+        $unit = Unit::where('id', $reservation['id_unit'])->where('id_owner', $user['id'])->count();
+        if($unit > 0) {
+
+            Reservation::find($id)->delete();
+
+        } else {
+          $array['error'] = 'Esta reserva não é sua.';
+          return $array;
+        }
+
+      } else {
+        $array['error'] = 'Reserva não existe.';
+        return $array;
+      }
+
+      return $array;
+    }
 }
